@@ -447,6 +447,72 @@ if "lista_lancamentos" not in st.session_state:
 # ---------------------------------------------------------
 # DIÁLOGOS E MODAIS
 # ---------------------------------------------------------
+@st.dialog("🧪 Registrar Análise de Sólidos", width="medium")
+def modal_analise_solidos():
+    st.subheader("Entrada de Dados do Composto")
+    
+    # 1. Input de nome do composto
+    nome_composto = st.text_input("1. Nome do composto a ser analisado", value="Inóculo A")
+    
+    col_a, col_b = st.columns(2)
+    # 2. Input de quantas réplicas
+    num_replicas = col_a.number_input("2. Número de réplicas", min_value=1, max_value=10, value=3, step=1)
+    # 3. Input de volume adicionado de composto
+    vol_adicionado = col_b.number_input("3. Volume adicionado de composto (mL)", min_value=0.0, value=10.0, step=0.5)
+    
+    # 6. Input de quanto tempo foi deixado na estufa
+    tempo_estufa = st.number_input("6. Tempo em estufa (horas)", min_value=0.0, value=24.0, step=0.5)
+
+    st.divider()
+    st.markdown("### Dados das Réplicas")
+
+    replicas_dados = []
+    for r in range(int(num_replicas)):
+        with st.container(border=True):
+            st.markdown(f"**Réplica #{r+1}**")
+            
+            c1, c2 = st.columns(2)
+            # 4. Input de massa de cadinho vazio após calcinação
+            massa_cadinho_vazio = c1.number_input(
+                "4. Massa do cadinho vazio após calcinação (g)",
+                min_value=0.0, value=15.0000, step=0.0001, format="%.4f",
+                key=f"cadinho_vazio_{r}"
+            )
+            # 5. Input de massa de composto adicionado
+            massa_composto_adic = c2.number_input(
+                "5. Massa de composto adicionado (g)",
+                min_value=0.0, value=10.0000, step=0.0001, format="%.4f",
+                key=f"composto_adic_{r}"
+            )
+
+            c3, c4 = st.columns(2)
+            # 6. Input de massa de cadinho após secagem em estufa
+            massa_cadinho_estufa = c3.number_input(
+                "6. Massa do cadinho após secagem em estufa (g)",
+                min_value=0.0, value=16.2000, step=0.0001, format="%.4f",
+                key=f"cadinho_estufa_{r}"
+            )
+            # 7. Input de massa com composto após calcinação
+            massa_cadinho_calcinado = c4.number_input(
+                "7. Massa com composto após calcinação (g)",
+                min_value=0.0, value=15.1000, step=0.0001, format="%.4f",
+                key=f"cadinho_calcinado_{r}"
+            )
+
+            replicas_dados.append({
+                "massa_cadinho_vazio": massa_cadinho_vazio,
+                "massa_composto_adic": massa_composto_adic,
+                "massa_cadinho_estufa": massa_cadinho_estufa,
+                "massa_cadinho_calcinado": massa_cadinho_calcinado
+            })
+
+    st.divider()
+    if st.button("💾 Salvar Análise de Sólidos", type="primary", use_container_width=True):
+        st.session_state.toast_msg = f"✅ Análise de sólidos para '{nome_composto}' registrada!"
+        st.session_state.modal_ativo = None
+        st.rerun()
+
+
 @st.dialog("📋 Resumo do Lançamento e Correção de pH", width="medium")
 def modal_resumo_popup():
     dados = st.session_state.resumo_calculo_popup
@@ -1024,7 +1090,7 @@ if "toast_msg" in st.session_state and st.session_state.toast_msg:
     del st.session_state["toast_msg"]
 
 st.write("")
-col_b1, col_b2, col_b3 = st.columns(3)
+col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 
 with col_b1:
     if st.button("➕ Registrar lançamento", type="primary", use_container_width=True):
@@ -1039,6 +1105,11 @@ with col_b2:
     st.caption("Insira os dados medidos nas réplicas para obter médias e gráficos de rendimento")
 
 with col_b3:
+    if st.button("🧪 Análise de Sólidos", use_container_width=True):
+        st.session_state.modal_ativo = "solidos"
+    st.caption("Registre réplicas, massas de cadinho, estufa e calcinação")
+
+with col_b4:
     if st.button("🎯 Estimar melhor composição", use_container_width=True):
         st.session_state.modal_ativo = "otimizacao"
     st.caption("Analise o histórico e encontre a proporção ideal entre os compostos")
@@ -1048,6 +1119,8 @@ if st.session_state.modal_ativo == "volume":
     modal_calcular_volume()
 elif st.session_state.modal_ativo == "rendimento":
     modal_calcular_rendimento()
+elif st.session_state.modal_ativo == "solidos":
+    modal_analise_solidos()
 elif st.session_state.modal_ativo == "otimizacao":
     modal_estimar_composicao()
 elif st.session_state.modal_ativo == "popup_resumo":
