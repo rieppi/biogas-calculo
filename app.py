@@ -50,45 +50,10 @@ st.markdown(
 
 
 # ---------------------------------------------------------
-# FUNÇÕES DE CÁLCULO DE SÓLIDOS E BICARBONATO
-# ---------------------------------------------------------
-def calcular_solidos_replicata(m_cadinho, m_umida, m_105, m_550):
-    """Calcula ST, SV e SF para uma única amostra/replicata gravimétrica."""
-    m_amostra = m_umida - m_cadinho
-    if m_amostra <= 0:
-        return {"st_pct": 0.0, "sv_pct": 0.0, "sf_pct": 0.0, "sv_st_pct": 0.0}
-
-    st_pct = ((m_105 - m_cadinho) / m_amostra) * 100.0
-    sf_pct = ((m_550 - m_cadinho) / m_amostra) * 100.0
-    sv_pct = st_pct - sf_pct
-    sv_st_pct = (sv_pct / st_pct * 100.0) if st_pct > 0 else 0.0
-
-    return {
-        "st_pct": max(0.0, round(st_pct, 2)),
-        "sv_pct": max(0.0, round(sv_pct, 2)),
-        "sf_pct": max(0.0, round(sf_pct, 2)),
-        "sv_st_pct": max(0.0, round(sv_st_pct, 2)),
-    }
-
-
-def calcular_bicarbonato(ph_atual, ph_alvo, vol_util_ml):
-    if ph_atual >= ph_alvo or ph_atual <= 0:
-        return 0.0
-
-    delta_ph = ph_alvo - ph_atual
-    beta = 0.02
-    vol_litros = vol_util_ml / 1000.0
-
-    moles_nahco3 = beta * delta_ph * vol_litros
-    massa_g = moles_nahco3 * 84.007
-    return round(massa_g, 4)
-
-
-# ---------------------------------------------------------
 # FUNÇÕES DE GERAÇÃO DE PDF (REPORTLAB)
 # ---------------------------------------------------------
 def gerar_pdf_popup_calculos(dados_popup):
-    """Gera PDF com o resumo dos cálculos iniciais incluindo a análise de sólidos."""
+    """Gera PDF com o resumo dos cálculos iniciais."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     story = []
@@ -103,21 +68,15 @@ def gerar_pdf_popup_calculos(dados_popup):
     story.append(Paragraph(f"Período: {dados_popup.get('data_str', '')}", body_style))
     story.append(Spacer(1, 15))
 
-    # Tabela 1: Caracterização de Sólidos e Totais
-    story.append(Paragraph("<b>1. Caracterização de Sólidos e Consumo Total dos Compostos</b>", sub_style))
+    # Tabela 1: Totais Gerais
+    story.append(Paragraph("<b>1. Volume / Massa Total dos Compostos (Todas Réplicas)</b>", sub_style))
     story.append(Spacer(1, 6))
     
-    data_totais = [["Composto", "ST (%)", "SV (%)", "SV/ST (%)", "Total Necessário"]]
+    data_totais = [["Composto", "Concentração SV", "Total Necessário (Ensaio)"]]
     for t in dados_popup.get("totais_compostos", []):
-        data_totais.append([
-            t.get("nome", ""),
-            f"{t.get('st_pct', 0.0):.2f}%",
-            f"{t.get('sv_pct', 0.0):.2f}%",
-            f"{t.get('sv_st_pct', 0.0):.1f}%",
-            t.get("total_formatado", "")
-        ])
+        data_totais.append([t.get("nome", ""), t.get("conc", ""), t.get("total_formatado", "")])
     
-    t_totais = Table(data_totais, colWidths=[140, 95, 95, 95, 105])
+    t_totais = Table(data_totais, colWidths=[200, 150, 180])
     t_totais.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E0E7FF')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#3730A3')),
@@ -167,7 +126,7 @@ def gerar_pdf_popup_calculos(dados_popup):
 
 
 def gerar_pdf_relatorio_finalizado(item):
-    """Gera PDF completo do lançamento finalizado com dados de caracterização de sólidos, parâmetros e rendimento."""
+    """Gera PDF completo do lançamento finalizado com dados de caracterização, parâmetros e rendimento."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     story = []
@@ -182,20 +141,14 @@ def gerar_pdf_relatorio_finalizado(item):
     story.append(Paragraph(f"Status: <b>{item.get('status', '')}</b> | Detalhes: {item.get('data_str', '')}", body_style))
     story.append(Spacer(1, 15))
 
-    # Tabela 1: Caracterização de Sólidos dos Compostos
-    story.append(Paragraph("<b>1. Caracterização de Sólidos e Consumo Total</b>", sub_style))
+    # Tabela 1: Caracterização dos Compostos
+    story.append(Paragraph("<b>1. Caracterização dos Compostos e Consumo Total</b>", sub_style))
     story.append(Spacer(1, 6))
-    data_comp = [["Composto", "ST (%)", "SV (%)", "SV/ST (%)", "Total Necessário"]]
+    data_comp = [["Composto", "Concentração SV", "Total Necessário no Ensaio"]]
     for c in item.get("compostos", []):
-        data_comp.append([
-            c.get("nome", ""),
-            f"{c.get('st_pct', 0.0):.2f}%",
-            f"{c.get('sv_pct', 0.0):.2f}%",
-            f"{c.get('sv_st_pct', 0.0):.1f}%",
-            c.get("qtd_total", "N/A")
-        ])
+        data_comp.append([c.get("nome", ""), c.get("conc", ""), c.get("qtd_total", "N/A")])
     
-    t_comp = Table(data_comp, colWidths=[140, 95, 95, 95, 105])
+    t_comp = Table(data_comp, colWidths=[200, 150, 180])
     t_comp.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E0E7FF')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#3730A3')),
@@ -265,8 +218,21 @@ def gerar_pdf_relatorio_finalizado(item):
 
 
 # ---------------------------------------------------------
-# GRÁFICOS E EXPORTAÇÃO
+# CÁLCULOS E GRÁFICOS
 # ---------------------------------------------------------
+def calcular_bicarbonato(ph_atual, ph_alvo, vol_util_ml):
+    if ph_atual >= ph_alvo or ph_atual <= 0:
+        return 0.0
+
+    delta_ph = ph_alvo - ph_atual
+    beta = 0.02
+    vol_litros = vol_util_ml / 1000.0
+
+    moles_nahco3 = beta * delta_ph * vol_litros
+    massa_g = moles_nahco3 * 84.007
+    return round(massa_g, 4)
+
+
 @st.cache_resource(show_spinner=False)
 def gerar_grafico_rendimento(labels, rend, ch4):
     fig, ax1 = plt.subplots(figsize=(6, 2.8))
@@ -354,7 +320,7 @@ def gerar_excel_quantidades(condicoes, compostos):
 
         for c in compostos:
             unidade = c.get("unidade", "g/mL")
-            sv_pct = c.get("sv_pct", 5.0)
+            val_conc = c.get("valor", 0.0)
 
             if unidade == "g/mL":
                 qtd_reator = round(vol_util / max(1, qtd_compostos), 1)
@@ -373,8 +339,7 @@ def gerar_excel_quantidades(condicoes, compostos):
                     "Volume Útil/Reator (mL)": vol_util,
                     "Réplicas": replicas,
                     "Composto": c.get("nome", ""),
-                    "Sólidos Voláteis (SV)": f"{sv_pct}%",
-                    "Unidade": unidade,
+                    "Concentração SV": f"{val_conc} {unidade}",
                     "Qtd / Reator": f"{qtd_reator} {unit_str}",
                     "Qtd Total Condição": f"{qtd_total_ensaio} {unit_str}",
                 }
@@ -384,9 +349,7 @@ def gerar_excel_quantidades(condicoes, compostos):
     return df.to_csv(index=False, sep=";").encode("utf-8-sig")
 
 
-# ---------------------------------------------------------
-# ESTADOS DA SESSÃO
-# ---------------------------------------------------------
+# Inicialização de Variáveis de Estado
 if "modal_ativo" not in st.session_state:
     st.session_state.modal_ativo = None
 if "item_para_deletar" not in st.session_state:
@@ -400,33 +363,10 @@ if "scroll_to_novo" not in st.session_state:
 if "resumo_calculo_popup" not in st.session_state:
     st.session_state.resumo_calculo_popup = None
 
-# Estrutura com análise gravimétrica de sólidos padrão para os compostos
 if "compostos" not in st.session_state:
     st.session_state.compostos = [
-        {
-            "nome": "Inóculo 1",
-            "unidade": "g/mL",
-            "st_pct": 2.50,
-            "sv_pct": 1.80,
-            "sf_pct": 0.70,
-            "sv_st_pct": 72.0,
-            "replicas_solidos": [
-                {"m_cadinho": 30.12, "m_umida": 45.12, "m_105": 30.495, "m_550": 30.225},
-                {"m_cadinho": 29.85, "m_umida": 44.85, "m_105": 30.225, "m_550": 29.955},
-            ]
-        },
-        {
-            "nome": "Substrato 1",
-            "unidade": "g/g",
-            "st_pct": 10.00,
-            "sv_pct": 8.50,
-            "sf_pct": 1.50,
-            "sv_st_pct": 85.0,
-            "replicas_solidos": [
-                {"m_cadinho": 31.00, "m_umida": 41.00, "m_105": 32.00, "m_550": 31.15},
-                {"m_cadinho": 30.50, "m_umida": 40.50, "m_105": 31.50, "m_550": 30.65},
-            ]
-        },
+        {"nome": "Inóculo 1", "valor": 15.0, "unidade": "g/mL"},
+        {"nome": "Substrato 1", "valor": 40.0, "unidade": "g/g"},
     ]
 
 if "condicoes" not in st.session_state:
@@ -449,18 +389,12 @@ if "lista_lancamentos" not in st.session_state:
             "compostos": [
                 {
                     "nome": "Inóculo 1",
-                    "conc": "1.80% SV",
-                    "st_pct": 2.50,
-                    "sv_pct": 1.80,
-                    "sv_st_pct": 72.0,
+                    "conc": "12.0 g/mL",
                     "qtd_total": "622.5 mL",
                 },
                 {
                     "nome": "Substrato 1",
-                    "conc": "8.50% SV",
-                    "st_pct": 10.00,
-                    "sv_pct": 8.50,
-                    "sv_st_pct": 85.0,
+                    "conc": "40.0 g/g",
                     "qtd_total": "382.5 g",
                 },
             ],
@@ -523,7 +457,7 @@ def modal_confirmar_deletar():
         st.rerun()
 
     st.write(f"Tem certeza que deseja deletar o lançamento **{item.get('titulo', '')}**?")
-    st.error("⚠️ **Atenção:** Esta ação não poderá ser desfeita!")
+    st.error("⚠️ **Atenção:** Esta ação não poderá ser desfeita e os dados do lançamento não podem ser recuperados!")
 
     col_cancel, col_confirm = st.columns(2)
     with col_cancel:
@@ -555,15 +489,12 @@ def modal_resumo_popup():
     st.caption(f"Período: {dados.get('data_str', '')}")
     st.divider()
 
-    st.markdown("### 📦 Caracterização de Sólidos e Totais Necessários")
+    st.markdown("### 📦 Total de Compostos Necessários (Todas as Condições & Réplicas)")
     totais_comp = dados.get("totais_compostos", [])
     if totais_comp:
         cols = st.columns(len(totais_comp))
         for idx, t_comp in enumerate(totais_comp):
-            with cols[idx % len(cols)]:
-                st.metric(t_comp["nome"], t_comp["total_formatado"])
-                st.caption(f"**ST:** {t_comp.get('st_pct', 0.0):.2f}% | **SV:** {t_comp.get('sv_pct', 0.0):.2f}%")
-                st.caption(f"**SV/ST:** {t_comp.get('sv_st_pct', 0.0):.1f}%")
+            cols[idx % len(cols)].metric(t_comp["nome"], t_comp["total_formatado"], help=f"Concentração: {t_comp['conc']}")
 
     st.divider()
     st.markdown("### Quantidades por Reator e Parâmetros Médios")
@@ -589,6 +520,8 @@ def modal_resumo_popup():
                     st.write("• **NaHCO₃ Médio:** `0.0 mg` *(pH ≥ 7.00)*")
 
     st.divider()
+    
+    # Download do PDF do Pop-up (Cálculos)
     pdf_bytes = gerar_pdf_popup_calculos(dados)
     
     col_pdf, col_sair = st.columns([1, 1])
@@ -608,7 +541,7 @@ def modal_resumo_popup():
             st.rerun()
 
 
-@st.dialog("➕ Registrar Novo Lançamento", width="large")
+@st.dialog("➕ Registrar Novo Lançamento", width="small")
 def modal_calcular_volume():
     if st.session_state.etapa_modal_vol == 1:
         st.subheader("1. Identificação e Período")
@@ -638,79 +571,42 @@ def modal_calcular_volume():
                 st.rerun()
 
     elif st.session_state.etapa_modal_vol == 2:
-        st.subheader("2. Caracterização dos Compostos e Análise de Sólidos (ST, SV, SF)")
-        st.caption("Insira as massas obtidas nas réplicas gravimétricas para calcular ST, SV e SF automaticamente:")
+        st.subheader("2. Caracterização dos Compostos")
 
         for i, comp in enumerate(st.session_state.compostos):
             with st.container(border=True):
-                st.markdown(f"### 🧪 Composto #{i+1}")
-                c_n, c_u = st.columns([2, 1])
-                novo_nome = c_n.text_input("Nome", value=comp["nome"], key=f"nome_comp_{i}")
-                nova_unit = c_u.selectbox(
-                    "Unidade de Dosagem",
+                st.markdown(f"**Composto #{i+1}**")
+                novo_nome = st.text_input(
+                    "Nome", value=comp["nome"], key=f"nome_comp_{i}"
+                )
+
+                c_val, c_unit = st.columns([2, 1])
+                novo_val = c_val.number_input(
+                    "Concentração SV",
+                    value=float(comp["valor"]),
+                    key=f"val_comp_{i}",
+                )
+                nova_unit = c_unit.selectbox(
+                    "Unidade",
                     ["g/mL", "g/g"],
                     index=0 if comp["unidade"] == "g/mL" else 1,
                     key=f"unit_comp_{i}",
                 )
 
-                st.markdown("#### ⚖️ Réplicas Gravimétricas de Sólidos")
-                replicas = comp.get("replicas_solidos", [
-                    {"m_cadinho": 30.0, "m_umida": 40.0, "m_105": 30.8, "m_550": 30.15}
-                ])
-
-                res_st, res_sv, res_sf, res_sv_st = [], [], [], []
-
-                for r_idx, rep in enumerate(replicas):
-                    st.caption(f"**Réplicata {r_idx + 1}**")
-                    col_cad, col_um, col_105, col_550 = st.columns(4)
-
-                    m_cad = col_cad.number_input("Cadinho (g)", value=float(rep["m_cadinho"]), step=0.01, key=f"c_{i}_r_{r_idx}")
-                    m_um = col_um.number_input("Cadinho + Umida (g)", value=float(rep["m_umida"]), step=0.01, key=f"u_{i}_r_{r_idx}")
-                    m_105 = col_105.number_input("Cadinho + 105°C (g)", value=float(rep["m_105"]), step=0.01, key=f"105_{i}_r_{r_idx}")
-                    m_550 = col_550.number_input("Cadinho + 550°C (g)", value=float(rep["m_550"]), step=0.01, key=f"550_{i}_r_{r_idx}")
-
-                    calc_r = calcular_solidos_replicata(m_cad, m_um, m_105, m_550)
-                    res_st.append(calc_r["st_pct"])
-                    res_sv.append(calc_r["sv_pct"])
-                    res_sf.append(calc_r["sf_pct"])
-                    res_sv_st.append(calc_r["sv_st_pct"])
-
-                    replicas[r_idx] = {
-                        "m_cadinho": m_cad, "m_umida": m_um, "m_105": m_105, "m_550": m_550
-                    }
-
-                if st.button(f"➕ Réplicata de Sólidos em {novo_nome}", key=f"add_rep_sol_{i}"):
-                    replicas.append({"m_cadinho": 30.0, "m_umida": 40.0, "m_105": 30.8, "m_550": 30.15})
-                    st.session_state.compostos[i]["replicas_solidos"] = replicas
-                    st.rerun()
-
-                st_m = float(np.mean(res_st))
-                sv_m = float(np.mean(res_sv))
-                sf_m = float(np.mean(res_sf))
-                sv_st_m = float(np.mean(res_sv_st))
-
-                st.info(f"📊 **Resultados Médios:** **ST:** `{st_m:.2f}%` | **SV:** `{sv_m:.2f}%` | **SF:** `{sf_m:.2f}%` | **SV/ST:** `{sv_st_m:.1f}%`")
-
                 st.session_state.compostos[i] = {
                     "nome": novo_nome,
+                    "valor": novo_val,
                     "unidade": nova_unit,
-                    "st_pct": st_m,
-                    "sv_pct": sv_m,
-                    "sf_pct": sf_m,
-                    "sv_st_pct": sv_st_m,
-                    "replicas_solidos": replicas,
                 }
 
         if st.button("➕ Adicionar Composto", key="add_comp"):
-            st.session_state.compostos.append({
-                "nome": f"Composto {len(st.session_state.compostos) + 1}",
-                "unidade": "g/mL",
-                "st_pct": 5.0,
-                "sv_pct": 4.0,
-                "sf_pct": 1.0,
-                "sv_st_pct": 80.0,
-                "replicas_solidos": [{"m_cadinho": 30.0, "m_umida": 40.0, "m_105": 30.5, "m_550": 30.1}],
-            })
+            st.session_state.compostos.append(
+                {
+                    "nome": f"Composto {len(st.session_state.compostos) + 1}",
+                    "valor": 0.0,
+                    "unidade": "g/mL",
+                }
+            )
             st.rerun()
 
         st.divider()
@@ -869,15 +765,7 @@ def modal_calcular_volume():
                 composicoes_estudadas = []
                 detalhes_popup_condicoes = []
 
-                totais_por_composto = {
-                    c["nome"]: {
-                        "qtd": 0.0,
-                        "unidade": c["unidade"],
-                        "st_pct": c.get("st_pct", 0.0),
-                        "sv_pct": c.get("sv_pct", 0.0),
-                        "sv_st_pct": c.get("sv_st_pct", 0.0)
-                    } for c in st.session_state.compostos
-                }
+                totais_por_composto = {c["nome"]: {"qtd": 0.0, "unidade": c["unidade"], "valor_conc": c["valor"]} for c in st.session_state.compostos}
 
                 for cond in st.session_state.condicoes:
                     hs = float(cond["headspace"])
@@ -890,7 +778,7 @@ def modal_calcular_volume():
 
                     for c in st.session_state.compostos:
                         unidade = c["unidade"]
-                        val_conc = c.get("sv_pct", 1.0)
+                        val_conc = c["valor"] if c["valor"] > 0 else 1.0
 
                         if unidade == "g/mL":
                             qtd_por_reator = round(vol_util / max(1, qtd_compostos), 1)
@@ -942,18 +830,13 @@ def modal_calcular_volume():
                     
                     compostos_calculados_geral.append({
                         "nome": name,
-                        "conc": f"{data['sv_pct']:.2f}% SV",
-                        "st_pct": data["st_pct"],
-                        "sv_pct": data["sv_pct"],
-                        "sv_st_pct": data["sv_st_pct"],
+                        "conc": f"{data['valor_conc']} {data['unidade']}",
                         "qtd_total": total_fmt,
                     })
                     
                     totais_popup.append({
                         "nome": name,
-                        "st_pct": data["st_pct"],
-                        "sv_pct": data["sv_pct"],
-                        "sv_st_pct": data["sv_st_pct"],
+                        "conc": f"{data['valor_conc']} {data['unidade']}",
                         "total_formatado": total_fmt
                     })
 
@@ -992,6 +875,85 @@ def modal_calcular_volume():
                 st.session_state.etapa_modal_vol = 1
                 st.session_state.modal_ativo = "popup_resumo"
                 st.rerun()
+
+
+@st.dialog("🧪 Registrar Análise de Sólidos", width="medium")
+def modal_analise_solidos():
+    st.caption("Preencha os parâmetros abaixo para registrar as réplicas da análise de sólidos.")
+    
+    # 1. Nome do composto
+    nome_composto = st.text_input("1. Nome do composto a ser analisado", value="Substrato A")
+    
+    # 2. Quantidade de réplicas
+    qtd_replicas = st.number_input("2. Quantidade de réplicas", min_value=1, max_value=10, value=3, step=1)
+    
+    # 3. Volume adicionado
+    vol_adicionado = st.number_input("3. Volume adicionado de composto (mL)", min_value=0.0, value=10.0, step=0.5)
+    
+    # 6. Tempo de estufa (Geral)
+    tempo_estufa = st.text_input("6. Tempo deixado na estufa", value="24 horas")
+    
+    st.divider()
+    st.markdown("### 📝 Dados por Réplica")
+    
+    dados_replicas = []
+    
+    for r in range(int(qtd_replicas)):
+        with st.container(border=True):
+            st.markdown(f"**Réplica #{r+1}**")
+            
+            c1, c2 = st.columns(2)
+            
+            # 4. Massa de cadinho vazio após calcinação
+            m_cadinho_vazio = c1.number_input(
+                "4. Massa do cadinho vazio após calcinação (g)",
+                min_value=0.0, value=25.0000, format="%.4f", key=f"m_cad_vazio_{r}"
+            )
+            
+            # 5. Massa de composto adicionado
+            m_composto_add = c2.number_input(
+                "5. Massa de composto adicionado (g)",
+                min_value=0.0, value=10.0000, format="%.4f", key=f"m_comp_add_{r}"
+            )
+            
+            c3, c4 = st.columns(2)
+            
+            # 6. Massa de cadinho após secagem em estufa
+            m_estufa = c3.number_input(
+                "6. Massa do cadinho após secagem em estufa (g)",
+                min_value=0.0, value=27.5000, format="%.4f", key=f"m_estufa_{r}"
+            )
+            
+            # 7. Massa com composto após calcinação
+            m_calcinado = c4.number_input(
+                "7. Massa com composto após calcinação (g)",
+                min_value=0.0, value=25.8000, format="%.4f", key=f"m_calcinado_{r}"
+            )
+            
+            dados_replicas.append({
+                "replica": r + 1,
+                "m_cadinho_vazio": m_cadinho_vazio,
+                "m_composto_add": m_composto_add,
+                "m_estufa": m_estufa,
+                "m_calcinado": m_calcinado
+            })
+
+    st.divider()
+    
+    if st.button("💾 Salvar Análise de Sólidos", type="primary", use_container_width=True):
+        if "analises_solidos" not in st.session_state:
+            st.session_state.analises_solidos = []
+            
+        st.session_state.analises_solidos.append({
+            "composto": nome_composto,
+            "volume_ml": vol_adicionado,
+            "tempo_estufa": tempo_estufa,
+            "replicas": dados_replicas
+        })
+        
+        st.session_state.toast_msg = f"✅ Análise de sólidos de '{nome_composto}' registrada!"
+        st.session_state.modal_ativo = None
+        st.rerun()
 
 
 @st.dialog("📊 Cálculo de Rendimento", width="medium")
@@ -1172,21 +1134,26 @@ if "toast_msg" in st.session_state and st.session_state.toast_msg:
     del st.session_state["toast_msg"]
 
 st.write("")
-col_b1, col_b2, col_b3 = st.columns(3)
+col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 
 with col_b1:
     if st.button("➕ Registrar lançamento", type="primary", use_container_width=True):
         st.session_state.etapa_modal_vol = 1
         st.session_state.modal_ativo = "volume"
-    st.caption("Análise gravimétrica de sólidos (ST/SV/SF), bicarbonato e massa de reagentes")
+    st.caption("Registre e calcule automaticamente o volume/massa dos compostos e bicarbonato")
 
 with col_b2:
+    if st.button("🧪 Análise de Sólidos", use_container_width=True):
+        st.session_state.modal_ativo = "solidos"
+    st.caption("Registre réplicas de massas e calcinamentos de sólidos")
+
+with col_b3:
     if st.button("📊 Calcular rendimento", use_container_width=True):
         st.session_state.etapa_modal_rend = 1
         st.session_state.modal_ativo = "rendimento"
-    st.caption("Insira os dados medidos nas réplicas para obter médias e gráficos de rendimento")
+    st.caption("Insira os dados medidos para obter médias e gráficos de rendimento")
 
-with col_b3:
+with col_b4:
     if st.button("🎯 Estimar melhor composição", use_container_width=True):
         st.session_state.modal_ativo = "otimizacao"
     st.caption("Analise o histórico e encontre a proporção ideal entre os compostos")
@@ -1194,6 +1161,8 @@ with col_b3:
 # Controle de Exibição dos Modais
 if st.session_state.modal_ativo == "volume":
     modal_calcular_volume()
+elif st.session_state.modal_ativo == "solidos":
+    modal_analise_solidos()
 elif st.session_state.modal_ativo == "rendimento":
     modal_calcular_rendimento()
 elif st.session_state.modal_ativo == "otimizacao":
@@ -1223,20 +1192,18 @@ for idx, item in enumerate(st.session_state.lista_lancamentos):
 
         st.write("")
         tab1, tab2, tab3 = st.tabs([
-            "🧪 1. Caracterização de Sólidos",
+            "🧪 1. Caracterização",
             "📊 2. Composições e Carga",
             "📈 3. Rendimento",
         ])
 
         with tab1:
-            st.markdown("**Caracterização Física dos Compostos e Quantidades Necessárias:**")
+            st.markdown("**Compostos Envolvidos e Quantidades Totais Necessárias:**")
             for comp in item["compostos"]:
                 with st.container(border=True):
-                    c_n, c_st, c_sv, c_rel, c_t = st.columns(5)
+                    c_n, c_c, c_t = st.columns(3)
                     c_n.markdown(f'<span class="pill-tag">{comp["nome"]}</span>', unsafe_allow_html=True)
-                    c_st.caption(f"ST: **{comp.get('st_pct', 0.0):.2f}%**")
-                    c_sv.caption(f"SV: **{comp.get('sv_pct', 0.0):.2f}%**")
-                    c_rel.caption(f"SV/ST: **{comp.get('sv_st_pct', 0.0):.1f}%**")
+                    c_c.caption(f"Concentração: **{comp['conc']}**")
                     c_t.markdown(f"**Total / Ensaio:** `{comp.get('qtd_total', 'N/A')}`")
 
         with tab2:
